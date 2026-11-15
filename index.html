@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>IBB – Controle de Empréstimos</title>
+  <style>
+    :root {
+      --bg: #f4f5f7; --card: #fff; --tx: #1d2330; --mu: #6b7385; --pr: #1f4e8c; --pt: #fff; --bd: #dfe3ea; --ok: #1b7f4b; --wn: #b45309; --rd: #b42318;
+      box-sizing: border-box;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; background: var(--bg); color: var(--tx);
+      font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+    header { display:flex; align-items:center; gap:10px; flex-wrap:wrap; background:var(--card); border-bottom:1px solid var(--bd); padding:10px 16px; }
+    header h1 { margin:0; flex:1; font-size:17px; }
+    header small { color:var(--mu); }
+    main { max-width:1100px; margin:0 auto; padding:16px; }
+    .card { background:var(--card); border:1px solid var(--bd); border-radius:12px; padding:16px; }
+    button { font:inherit; border:1px solid var(--bd); background:var(--card); color:var(--tx); border-radius:8px; padding:8px 12px; cursor:pointer; }
+    button.p { background:var(--pr); color:var(--pt); border-color:var(--pr); }
+    button.on { border-color:var(--pr); color:var(--pr); font-weight:600; }
+    button.d { color:var(--rd); }
+    input, select { font:inherit; width:100%; padding:9px 10px; border:1px solid var(--bd); border-radius:8px; background:var(--bg); color:var(--tx); }
+    label { display:block; margin:10px 0; font-size:13px; color:var(--mu); }
+    label input, label select { margin-top:4px; }
+    .login { max-width:360px; margin:8vh auto; }
+    .login h2 { margin-top:0; }
+    .bar { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:12px; }
+    .bar .sp { flex:1; }
+    .bar input { width:auto; }
+    .tw { overflow-x:auto; }
+    table { border-collapse:collapse; width:100%; min-width:640px; }
+    th, td { text-align:left; padding:9px 8px; border-bottom:1px solid var(--bd); vertical-align:top; }
+    th { font-size:12px; color:var(--mu); text-transform:uppercase; }
+    tr.off td { opacity:.5; }
+    .tag { display:inline-block; font-size:12px; padding:1px 8px; border-radius:99px; border:1px solid currentColor; }
+    .ok { color:var(--ok); }
+    .wn { color:var(--wn); }
+    .rd { color:var(--rd); }
+    .mu { color:var(--mu); }
+    .row { display:flex; gap:10px; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid var(--bd); }
+    .r2 { display:flex; gap:8px; margin:8px 0; }
+    .chip { display:inline-block; background:var(--bg); border:1px solid var(--bd); border-radius:99px; padding:2px 10px; margin:3px 4px 0 0; font-size:13px; }
+    .chip a { cursor:pointer; color:var(--rd); }
+    .sel { background:var(--bg); border:1px solid var(--ok); border-radius:8px; padding:8px; margin-top:8px; }
+    .ov { position:fixed; inset:0; background:rgba(0,0,0,.5); display:flex; align-items:flex-start; justify-content:center; padding:5vh 12px; overflow:auto; z-index:20; }
+    .md { background:var(--card); border-radius:14px; padding:18px; width:100%; max-width:520px; border:1px solid var(--bd); }
+    .md h3 { margin:0 0 6px; }
+    .act { display:flex; gap:8px; justify-content:flex-end; margin-top:14px; }
+    .hero { background:var(--pr); color:var(--pt); border-radius:16px; padding:24px 26px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; }
+    .hero h2 { margin:0; font-size:26px; }
+    .hero p { margin:4px 0 0; opacity:.85; }
+    .cta { background:var(--pt); color:var(--pr); border:0; font-weight:700; font-size:16px; padding:14px 22px; border-radius:12px; display:flex; gap:10px; align-items:center; }
+    .strip { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); margin:14px 0 22px; background:var(--card); border:1px solid var(--bd); border-radius:14px; }
+    .strip div { padding:14px 18px; border-right:1px solid var(--bd); }
+    .strip div:last-child { border:0; }
+    .strip b { display:block; font-size:28px; }
+    .strip span { color:var(--mu); font-size:13px; }
+    .tiles { display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:12px; margin-bottom:24px; }
+    .tile { display:flex; gap:14px; align-items:center; text-align:left; padding:16px; border-radius:14px; }
+    .tile svg { flex:none; color:var(--pr); background:var(--bg); border-radius:10px; padding:9px; }
+    .tile b { display:block; font-size:16px; }
+    .tile small { color:var(--mu); }
+    .sec { display:flex; justify-content:space-between; align-items:center; margin:0 0 8px; }
+    .sec h3 { margin:0; font-size:17px; }
+    #tp { position:fixed; z-index:40; max-width:300px; background:var(--card); color:var(--tx); border:1px solid var(--bd); border-radius:8px; padding:8px 10px; box-shadow:0 4px 14px rgba(0,0,0,.25); font-size:13px; pointer-events:none; display:none; }
+    @media print {
+      header button, .bar, .act, td button, th:last-child, td:last-child { display:none !important; }
+      body { background:#fff!important; color:#000!important; }
+      .card { background:#fff!important; border:0!important; }
+      table, td, th, small, b { color:#000!important; }
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <div id="mo"></div>
+
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+  <script src="./firebase-config.js"></script>
+  <script>
+    const appState = {
+      users: [], people: [], items: [], loans: [], off: 0,
+      user: null,
+      db: null,
+      view: 'login',
+      tab: 'p',
+      cq: '',
+      cs: 'a',
+      f: 'hoje',
+      a: '',
+      b: '',
+      auth: []
+    };
+
+    const $ = (s) => document.querySelector(s);
+    const hash = async (s) => {
+      const data = new TextEncoder().encode('ibb:' + s);
+      const digest = await crypto.subtle.digest('SHA-256', data);
+      return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
+    };
+    const now = () => Date.now() + appState.off;
+    const nid = () => Date.now() * 100 + Math.floor(Math.random() * 100);
+    const esc = (s) => String(s ?? '').replace(/[&<>\"]/g, (c) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
+    const dt = (t) => t ? new Date(t).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : '—';
+    const isAdmin = () => appState.user && appState.user.perfil === 'Admin';
+    const lo = (itemId) => appState.loans.find((l) => l.itemId == itemId && !l.dv);
+
+    function readLocal() {
+      try {
+        const raw = localStorage.getItem('ibb_recepcao_state');
+        return raw ? JSON.parse(raw) : { users: [], people: [], items: [], loans: [], off: 0 };
+      } catch {
+        return { users: [], people: [], items: [], loans: [], off: 0 };
+      }
+    }
+
+    function writeLocal() {
+      localStorage.setItem('ibb_recepcao_state', JSON.stringify({
+        users: appState.users,
+        people: appState.people,
+        items: appState.items,
+        loans: appState.loans,
+        off: appState.off
+      }));
+    }
+
+    function getFirebaseConfig() {
+      const cfg = window.FIREBASE_CONFIG || {};
+      return cfg && cfg.apiKey && cfg.projectId && !String(cfg.projectId).includes('YOUR_PROJECT_ID') ? cfg : null;
+    }
+
+    async function saveData() {
+      if (appState.db && appState.db.mode !== 'local') {
+        try {
+          await Promise.all([
+            ...appState.users.map((u) => appState.db.collection('users').doc(String(u.id)).set(u)),
+            ...appState.people.map((p) => appState.db.collection('people').doc(String(p.id)).set(p)),
+            ...appState.items.map((i) => appState.db.collection('items').doc(String(i.id)).set(i)),
+            ...appState.loans.map((l) => appState.db.collection('loans').doc(String(l.id)).set(l)),
+          ]);
+          await appState.db.doc('cfg/main').set({ off: appState.off });
+        } catch (err) {
+          console.error('saveData failed', err);
+          alert('Não foi possível gravar os dados no Firebase. Verifique a configuração.');
+        }
+        return;
+      }
+      writeLocal();
+    }
+
+    async function loadRemoteData() {
+      appState.db = firebase.firestore();
+      const collections = ['users', 'people', 'items', 'loans'];
+      for (const name of collections) {
+        const snap = await appState.db.collection(name).get();
+        appState[name] = snap.docs.map((doc) => doc.data());
+      }
+      const cfgDoc = await appState.db.doc('cfg/main').get();
+      appState.off = cfgDoc.exists ? Number(cfgDoc.data().off || 0) : 0;
+    }
+
+    async function seedDefaults() {
+      if (appState.users.length > 0) return;
+      const adminHash = await hash('admin123');
+      const recepcaoHash = await hash('recepcao123');
+      appState.users = [
+        { id: 1, nome: 'Administrador', login: 'admin', senha: adminHash, perfil: 'Admin', ativo: 1 },
+        { id: 2, nome: 'Recepção', login: 'recepcao', senha: recepcaoHash, perfil: 'Recepção', ativo: 1 }
+      ];
+      await saveData();
+      draw();
+    }
+
+    async function init() {
+      $('#app').innerHTML = '<main><p class="mu">Carregando…</p></main>';
+      const cfg = getFirebaseConfig();
+      if (!cfg) {
+        const state = readLocal();
+        appState.users = state.users || [];
+        appState.people = state.people || [];
+        appState.items = state.items || [];
+        appState.loans = state.loans || [];
+        appState.off = Number(state.off || 0);
+        appState.db = { mode: 'local' };
+        await seedDefaults();
+        return;
+      }
+      try {
+        if (!firebase.apps.length) firebase.initializeApp(cfg);
+        await loadRemoteData();
+        await seedDefaults();
+      } catch (error) {
+        console.error(error);
+        $('#app').innerHTML = '<main><div class="card login"><h2>Erro ao carregar</h2><p>Não foi possível conectar ao Firebase. Verifique o arquivo firebase-config.js.</p></div></main>';
+      }
+    }
+
+    function toast(message, bad = false) {
+      let node = $('#ts');
+      if (!node) {
+        node = document.createElement('div');
+        node.id = 'ts';
+        node.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));max-width:90vw;padding:10px 16px;border-radius:10px;color:#fff;z-index:50;font-size:14px';
+        document.body.appendChild(node);
+      }
+      node.style.background = bad ? '#b42318' : '#1b7f4b';
+      node.textContent = message;
+      node.style.display = 'block';
+      clearTimeout(node._t);
+      node._t = setTimeout(() => { node.style.display = 'none'; }, bad ? 9000 : 3000);
+    }
+    window.alert = (message) => toast(message, true);
+
+    function modal(html) { $('#mo').innerHTML = `<div class="ov"><div class="md">${html}</div></div>`; }
+    function closeModal() { $('#mo').innerHTML = ''; }
+    function go(view) { if (view === 'cfg' && !isAdmin()) return; appState.view = view; draw(); }
+    function draw() {
+      if (!appState.user) {
+        $('#app').innerHTML = `
+          <main>
+            <div class="card login">
+              <h2>IBB – Empréstimos</h2>
+              <p class="mu">Controle de chaves, controles e equipamentos da recepção.</p>
+              <label>Usuário<input id="lu" autocomplete="username"></label>
+              <label>Senha<input id="lp" type="password" autocomplete="current-password" onkeydown="if(event.key==='Enter') entrar()"></label>
+              <button class="p" style="width:100%" onclick="entrar()">Entrar</button>
+              <p class="mu" style="font-size:12px">Primeiro acesso: admin / admin123.</p>
+            </div>
+          </main>
+        `;
+        return;
+      }
+
+      const titleMap = { home: 'Home', cad: 'Cadastro', emp: 'Empréstimos', cfg: 'Configurações' };
+      const page = titleMap[appState.view];
+      let html = `<header><h1>IBB · ${page}</h1><small id="clk"></small><small>${esc(appState.user.nome)} (${appState.user.perfil})</small>${appState.view !== 'home' ? '<button onclick="go(\'home\')">Home</button>' : ''}<button onclick="sair()">Sair</button></header><main>`;
+      html += appState.view === 'home' ? vHome() : appState.view === 'cad' ? vCad() : appState.view === 'emp' ? vEmp() : vCfg();
+      $('#app').innerHTML = html + '</main>';
+      tick();
+    }
+    function tick() { const c = $('#clk'); if (c) c.textContent = dt(now()); }
+    setInterval(tick, 20000);
+
+    async function entrar() {
+      const login = $('#lu').value.trim();
+      const passHash = await hash($('#lp').value);
+      const user = appState.users.find((u) => u.ativo && u.login === login && u.senha === passHash);
+      if (!user) return alert('Usuário ou senha inválidos.');
+      appState.user = user;
+      appState.view = 'home';
+      draw();
+    }
+    function sair() { appState.user = null; appState.view = 'login'; closeModal(); draw(); }
+
+    const IC = {
+      key: '<circle cx="8" cy="15" r="4"/><path d="M10.8 12.2 20 3m-3 3 3 3"/>',
+      list: '<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1M9 10h6M9 14h6"/>',
+      users: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6M16 4.8a3.5 3.5 0 0 1 0 6.4M18 14.4c2.2.6 3.5 2.5 3.5 5.6"/>',
+      gear: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9 7 7M17 17l2.1 2.1M19.1 4.9 17 7M7 17l-2.1 2.1"/>'
+    };
+    const svg = (k, n = 26) => `<svg viewBox="0 0 24 24" width="${n}" height="${n}" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${IC[k]}</svg>`;
+
+    function vHome() {
+      const nowDate = new Date(now());
+      const h = nowDate.getHours();
+      const saudacao = h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite';
+      let data = nowDate.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+      data = data[0].toUpperCase() + data.slice(1);
+      const diaInicio = +new Date(nowDate.getFullYear(), nowDate.getMonth(), nowDate.getDate());
+      const pendentes = appState.loans.filter((l) => !l.dv).sort((a, b) => a.out - b.out);
+      const itensAtivos = appState.items.filter((i) => i.ativo);
+      const disponiveis = itensAtivos.filter((i) => !lo(i.id)).length;
+      const hoje = appState.loans.filter((l) => l.out >= diaInicio).length;
+      const tile = (view, icon, title, subtitle) => `<button class="tile" onclick="go('${view}')">${svg(icon)}<span><b>${title}</b><small>${subtitle}</small></span></button>`;
+      return `
+        <section class="hero">
+          <div><h2>${saudacao}, ${esc(appState.user.nome.split(' ')[0])}</h2><p>${data}</p></div>
+          <button class="cta" onclick="go('emp'); reg()">${svg('key', 22)}Registrar empréstimo</button>
+        </section>
+        <section class="strip">
+          <div><b class="${pendentes.length ? 'wn' : ''}">${pendentes.length}</b><span>Aguardando devolução</span></div>
+          <div><b>${hoje}</b><span>Registrados hoje</span></div>
+          <div><b>${disponiveis}</b><span>Itens disponíveis de ${itensAtivos.length}</span></div>
+        </section>
+        <section class="tiles">
+          ${tile('emp', 'list', 'Empréstimos', 'Histórico, filtros e exportação')}
+          ${tile('cad', 'users', 'Cadastro', 'Pessoas e itens')}
+          ${isAdmin() ? tile('cfg', 'gear', 'Configurações', 'Usuários, permissões e horário') : ''}
+        </section>
+        <div class="sec"><h3>Aguardando devolução</h3>${pendentes.length > 6 ? `<button onclick="appState.f='pend'; go('emp')">Ver todos (${pendentes.length})</button>` : ''}</div>
+        <div class="card">
+          ${pendentes.slice(0, 6).map((l) => `
+            <div class="row">
+              <div><b>${esc(l.iDesc)}</b> <small class="mu">${esc(l.iCod)}</small><br><small class="mu">${esc(l.pNome)} · ${esc(l.pSet)}</small></div>
+              <div style="text-align:right"><small class="mu">desde ${dt(l.out)}</small><br><button onclick="dev(${l.id})">Devolver</button></div>
+            </div>
+          `).join('') || '<p class="mu" style="margin:0">Nenhum item pendente. Tudo foi devolvido.</p>'}
+        </div>
+      `;
+    }
+
+    function fq(item) {
+      return [item.nome, item.tel, item.setor, item.desc, item.cod].join(' ').toLowerCase().includes((appState.cq || '').toLowerCase()) && (appState.cs === 't' || (appState.cs === 'i' ? !item.ativo : !!item.ativo));
+    }
+
+    function vCad() {
+      const peopleMode = appState.tab === 'p';
+      let html = `<div class="bar"><button class="${peopleMode ? 'on' : ''}" onclick="appState.tab='p'; appState.cq=''; draw()">Pessoas</button><button class="${peopleMode ? '' : 'on'}" onclick="appState.tab='i'; appState.cq=''; draw()">Itens</button><span class="sp"></span><input id="cq" placeholder="Pesquisar…" value="${esc(appState.cq)}" style="max-width:240px" oninput="appState.cq=this.value; draw(); const e=$('#cq'); e.focus(); e.setSelectionRange(999,999)"><select style="width:auto" onchange="appState.cs=this.value; draw()"><option value="a" ${appState.cs === 'a' ? 'selected' : ''}>Ativos</option><option value="i" ${appState.cs === 'i' ? 'selected' : ''}>Inativos</option><option value="t" ${appState.cs === 't' ? 'selected' : ''}>Ativos e inativos</option></select><button onclick="imp()">🖨 Imprimir</button><button class="p" onclick="${peopleMode ? 'pForm()' : 'iForm()'}">＋ Novo</button></div><div class="card tw"><table>`;
+      if (peopleMode) {
+        html += '<tr><th>Nome<th>Telefone<th>Setor/Ministério<th>Status<th></tr>' + appState.people.filter(fq).map((p) => `<tr class="${p.ativo ? '' : 'off'}"><td>${esc(p.nome)}<td>${esc(p.tel)}<td>${esc(p.setor)}<td>${p.ativo ? 'Ativo' : 'Inativo'}<td><button onclick="pForm(${p.id})">Editar</button> <button class="d" onclick="tg('people', ${p.id})">${p.ativo ? 'Inativar' : 'Ativar'}</button></tr>`).join('');
+      } else {
+        html += '<tr><th>Descrição<th>Código<th>Setor/Ministério<th>Restrito<th>Status<th></tr>' + appState.items.filter(fq).map((i) => `<tr class="${i.ativo ? '' : 'off'}"><td>${esc(i.desc)}<td>${esc(i.cod)}<td>${esc(i.setor)}<td>${i.restr ? `Sim (${(i.aut || []).length} autorizados)` : 'Não'}<td>${i.ativo ? 'Ativo' : 'Inativo'}<td><button onclick="iForm(${i.id})">Editar</button> <button class="d" onclick="tg('items', ${i.id})">${i.ativo ? 'Inativar' : 'Ativar'}</button></tr>`).join('');
+      }
+      return html + '</table>' + ((peopleMode ? appState.people : appState.items).filter(fq).length ? '' : '<p class="mu">Nenhum registro encontrado.</p>') + '</div>';
+    }
+
+    function tg(collection, id) {
+      const item = appState[collection].find((x) => x.id == id);
+      if (collection === 'items' && item.ativo && lo(id)) return alert('Este item está emprestado. Registre a devolução antes de inativar.');
+      if (collection === 'users' && item.ativo) {
+        if (item.id === appState.user.id) return alert('Você não pode inativar o próprio usuário.');
+        if (item.perfil === 'Admin' && appState.users.filter((u) => u.ativo && u.perfil === 'Admin').length < 2) return alert('É preciso manter ao menos um Admin ativo.');
+      }
+      item.ativo = item.ativo ? 0 : 1;
+      saveData();
+      draw();
+    }
+
+    function pForm(id) {
+      const p = appState.people.find((x) => x.id == id) || {};
+      modal(`<h3>${id ? 'Editar' : 'Nova'} pessoa</h3><label>Nome<input id="pn" value="${esc(p.nome)}"></label><label>Telefone<input id="pt" type="tel" value="${esc(p.tel)}"></label><label>Setor/Ministério<input id="ps" value="${esc(p.setor)}"></label><div class="act"><button onclick="closeModal()">Cancelar</button><button class="p" onclick="pSave(${id || 0})">Salvar</button></div>`);
+    }
+    function pSave(id) {
+      const nome = $('#pn').value.trim();
+      const tel = $('#pt').value.trim();
+      const setor = $('#ps').value.trim();
+      if (!nome || !tel || !setor) return alert('Preencha nome, telefone e setor/ministério.');
+      if (id) Object.assign(appState.people.find((x) => x.id == id), { nome, tel, setor });
+      else appState.people.push({ id: nid(), nome, tel, setor, ativo: 1 });
+      saveData(); closeModal(); draw();
+    }
+
+    function iForm(id) {
+      const item = appState.items.find((x) => x.id == id) || {};
+      appState.auth = [...(item.aut || [])];
+      modal(`<h3>${id ? 'Editar' : 'Novo'} item</h3><label>Descrição<input id="xd" value="${esc(item.desc)}"></label><label>Código<input id="xc" value="${esc(item.cod)}"></label><label>Setor/Ministério<input id="xs" value="${esc(item.setor)}"></label><label><input type="checkbox" id="xr" ${item.restr ? 'checked' : ''} onchange="aR()"> Restrito (somente pessoas autorizadas)</label><div id="ar"></div><div class="act"><button onclick="closeModal()">Cancelar</button><button class="p" onclick="iSave(${id || 0})">Salvar</button></div>`);
+      aR();
+    }
+    function aR() {
+      $('#ar').innerHTML = $('#xr').checked ? `<div class="r2"><select id="as"><option value="">Selecionar pessoa autorizada…</option>${appState.people.filter((p) => p.ativo && !appState.auth.includes(p.id)).map((p) => `<option value="${p.id}">${esc(p.nome)} (${esc(p.setor)})</option>`).join('')}</select><button onclick="aA()">Adicionar</button></div><div>${appState.auth.map((a) => { const p = appState.people.find((z) => z.id == a); return `<span class="chip">${esc(p ? p.nome : '?')} <a onclick="aD(${a})">✕</a></span>`; }).join('') || '<small class="mu">Nenhuma pessoa autorizada ainda.</small>'}</div>` : '';
+    }
+    function aA() {
+      const v = +$('#as').value;
+      if (v) { appState.auth.push(v); aR(); }
+    }
+    function aD(id) { appState.auth = appState.auth.filter((z) => z != id); aR(); }
+    function iSave(id) {
+      const desc = $('#xd').value.trim();
+      const cod = $('#xc').value.trim();
+      const setor = $('#xs').value.trim();
+      const restr = $('#xr').checked;
+      if (!desc || !cod || !setor) return alert('Preencha descrição, código e setor/ministério.');
+      if (restr && !appState.auth.length) return alert('Item restrito precisa de ao menos uma pessoa autorizada.');
+      if (appState.items.some((y) => y.id != id && y.cod.toLowerCase() === cod.toLowerCase())) return alert('Já existe um item com este código.');
+      const payload = { desc, cod, setor, restr, aut: restr ? [...appState.auth] : [] };
+      if (id) Object.assign(appState.items.find((y) => y.id == id), payload);
+      else appState.items.push({ id: nid(), ativo: 1, ...payload });
+      saveData(); closeModal(); draw();
+    }
+
+    function inR(l) {
+      if (appState.f === 'pend') return !l.dv;
+      const today = new Date(now());
+      const d0 = +new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      let a, b = Infinity;
+      if (appState.f === 'hoje') a = d0;
+      else if (appState.f === 'semana') a = d0 - ((today.getDay() + 6) % 7) * 864e5;
+      else if (appState.f === 'mes') a = +new Date(today.getFullYear(), today.getMonth(), 1);
+      else { a = appState.a ? +new Date(appState.a + 'T00:00') : -Infinity; b = appState.b ? +new Date(appState.b + 'T23:59:59') : Infinity; }
+      return l.out >= a && l.out <= b;
+    }
+    const listFiltrada = () => appState.loans.filter(inR).sort((x, y) => y.out - x.out);
+
+    function vEmp() {
+      const btn = (k, label) => `<button class="${appState.f === k ? 'on' : ''}" onclick="appState.f='${k}'; draw()">${label}</button>`;
+      const lista = listFiltrada();
+      return `
+        <div class="bar">
+          ${btn('hoje', 'Hoje')}${btn('semana', 'Semana')}${btn('mes', 'Mês')}${btn('per', 'Período')}${btn('pend', 'Pendentes de devolução')}
+          <span class="sp"></span>
+          <button onclick="imp()">🖨 Imprimir</button>
+          <button onclick="exp()">⬇ Exportar</button>
+          <button class="p" onclick="reg()">Registrar</button>
+        </div>
+        ${appState.f === 'per' ? `<div class="bar"><label style="margin:0">De <input type="date" value="${appState.a}" onchange="appState.a=this.value; draw()"></label><label style="margin:0">Até <input type="date" value="${appState.b}" onchange="appState.b=this.value; draw()"></label></div>` : ''}
+        <div class="card tw"><table><tr><th>Item<th>Pessoa<th>Setor/Ministério<th>Emprestado em<th>Devolvido em<th></tr>${lista.map((l) => `<tr><td>${esc(l.iDesc)}<br><small class="mu">${esc(l.iCod)}</small><td>${esc(l.pNome)}<br><small class="mu">${esc(l.pTel)}</small><td>${esc(l.pSet)}<td>${dt(l.out)}<td>${l.dv ? dt(l.dv) : '<span class="tag wn">Pendente</span>'}<td><button onclick="obsE(${l.id})" onmouseenter="tip(this,${l.id})" onmouseleave="tipx()">Obs.${obsList(l).length ? ` (${obsList(l).length})` : ''}</button> ${l.dv ? '' : `<button onclick="dev(${l.id})">Devolver</button>`}</tr>`).join('')}</table>${lista.length ? '' : '<p class="mu">Nenhum registro neste filtro.</p>'}</div>
+      `;
+    }
+
+    function reg() {
+      modal(`<h3>Registrar</h3><input id="q" placeholder="Buscar item pela descrição ou código" oninput="rs()"><div id="res"></div><div class="act"><button onclick="closeModal()">Fechar</button></div>`);
+      rs(); $('#q').focus();
+    }
+    function rs() {
+      const q = $('#q').value.toLowerCase();
+      const list = appState.items.filter((i) => i.ativo && (i.desc + ' ' + i.cod).toLowerCase().includes(q)).slice(0, 20);
+      $('#res').innerHTML = list.map((i) => {
+        const itemLoan = lo(i.id);
+        return `<div class="row"><div><b>${esc(i.desc)}</b> <small class="mu">${esc(i.cod)} · ${esc(i.setor)}</small>${i.restr ? ' <span class="tag wn">Restrito</span>' : ''}<br>${itemLoan ? `<span class="tag rd">Emprestado a ${esc(itemLoan.pNome)} desde ${dt(itemLoan.out)}</span>` : '<span class="tag ok">Disponível</span>'}</div>${itemLoan ? `<button onclick="dev(${itemLoan.id})">Devolver</button>` : `<button class="p" onclick="emp(${i.id})">Emprestar</button>`}</div>`;
+      }).join('') || '<p class="mu">Nenhum item encontrado.</p>';
+    }
+
+    function dev(id) {
+      const loan = appState.loans.find((x) => x.id == id);
+      if (!loan) return alert('Registro não encontrado.');
+      if (loan.dv) return alert('Este item já foi devolvido.');
+      loan.dv = now();
+      loan.userIn = appState.user.nome;
+      if ($('#res')) rs();
+      draw();
+      saveData();
+      toast('Devolução registrada.');
+    }
+
+    function emp(itemId) {
+      const item = appState.items.find((x) => x.id == itemId);
+      appState.r = { item, p: null, np: false };
+      modal(`<h3>Emprestar: ${esc(item.desc)}</h3>${item.restr ? '<p class="tag wn">Item restrito: apenas pessoas autorizadas</p>' : ''}<input id="pq" placeholder="Pessoa (digite o nome)" oninput="ps()"><div id="pr"></div><div id="sl"></div><div id="nf"></div><label>Observação (opcional)<input id="obx"></label><div class="act"><button onclick="reg()">Voltar</button><button class="p" onclick="salvar()">Salvar</button></div>`);
+      ps(); $('#pq').focus();
+    }
+    function ps() {
+      const q = $('#pq').value.toLowerCase();
+      const item = appState.r.item;
+      let list = appState.people.filter((p) => p.ativo && p.nome.toLowerCase().includes(q));
+      if (item.restr) list = list.filter((p) => (item.aut || []).includes(p.id));
+      $('#pr').innerHTML = list.slice(0, 6).map((p) => `<div class="row"><div>${esc(p.nome)} <small class="mu">${esc(p.setor)} · ${esc(p.tel)}</small></div><button onclick="ch(${p.id})">Selecionar</button></div>`).join('') + (item.restr ? (list.length ? '' : '<p class="mu">Nenhuma pessoa autorizada encontrada. Este item não pode ser emprestado a outra pessoa.</p>') : `<div class="row"><span class="mu">Não encontrou?</span><button onclick="np()">＋ Cadastrar nova pessoa</button></div>`);
+    }
+    function ch(id) {
+      const pessoa = appState.people.find((x) => x.id == id);
+      appState.r.p = pessoa; appState.r.np = false;
+      $('#nf').innerHTML = '';
+      $('#sl').innerHTML = `<div class="sel">✔ ${esc(pessoa.nome)} · ${esc(pessoa.setor)} · ${esc(pessoa.tel)}</div>`;
+    }
+    function np() {
+      appState.r.p = null; appState.r.np = true;
+      $('#sl').innerHTML = '';
+      $('#nf').innerHTML = `<label>Nome<input id="nn" value="${esc($('#pq').value)}"></label><label>Telefone<input id="nt" type="tel"></label><label>Setor/Ministério<input id="ns"></label>`;
+    }
+    function salvar() {
+      const item = appState.r.item;
+      if (lo(item.id)) { alert('Este item já está emprestado.'); return reg(); }
+      let pessoa = appState.r.p;
+      if (appState.r.np) {
+        const nome = $('#nn').value.trim();
+        const tel = $('#nt').value.trim();
+        const setor = $('#ns').value.trim();
+        if (!nome || !tel || !setor) return alert('Preencha nome, telefone e setor/ministério.');
+        pessoa = { id: nid(), nome, tel, setor, ativo: 1 };
+        appState.people.push(pessoa);
+      }
+      if (!pessoa) return alert('Selecione ou cadastre a pessoa.');
+      if (item.restr && !(item.aut || []).includes(pessoa.id)) return alert('Pessoa não autorizada para este item restrito.');
+      const obs = $('#obx').value.trim() ? [{ t: now(), u: appState.user.nome, x: $('#obx').value.trim() }] : [];
+      appState.loans.push({ id: nid(), itemId: item.id, iDesc: item.desc, iCod: item.cod, iSet: item.setor, pId: pessoa.id, pNome: pessoa.nome, pTel: pessoa.tel, pSet: pessoa.setor, out: now(), dv: 0, userOut: appState.user.nome, userIn: '', obs });
+      saveData(); closeModal(); draw();
+    }
+
+    function obsList(loan) { return Array.isArray(loan.obs) ? loan.obs : (loan.obs ? [{ t: loan.out, u: loan.userOut, x: loan.obs }] : []); }
+    function tip(el, id) {
+      const loan = appState.loans.find((x) => x.id == id); if (!loan) return;
+      const list = obsList(loan);
+      let node = $('#tp'); if (!node) { node = document.createElement('div'); node.id = 'tp'; document.body.appendChild(node); }
+      node.innerHTML = list.length ? list.map((o) => `<div style="margin-bottom:6px"><small class="mu">${dt(o.t)} · ${esc(o.u)}</small><br>${esc(o.x)}</div>`).join('') : '<span class="mu">Sem observações.</span>';
+      const rect = el.getBoundingClientRect();
+      node.style.display = 'block';
+      node.style.left = Math.max(8, Math.min(rect.left, innerWidth - node.offsetWidth - 8)) + 'px';
+      node.style.top = (rect.bottom + 6 + node.offsetHeight > innerHeight ? Math.max(8, rect.top - 6 - node.offsetHeight) : rect.bottom + 6) + 'px';
+    }
+    function tipx() { const node = $('#tp'); if (node) node.style.display = 'none'; }
+    function obsE(id) {
+      tipx();
+      const loan = appState.loans.find((x) => x.id == id);
+      const list = obsList(loan);
+      modal(`<h3>Observações</h3><small class="mu">${esc(loan.iDesc)} · ${esc(loan.pNome)}</small><div style="margin-top:8px">${list.map((o) => `<div class="row" style="display:block"><small class="mu">${dt(o.t)} · ${esc(o.u)}</small><br>${esc(o.x)}</div>`).join('') || '<p class="mu">Nenhuma observação ainda.</p>'}</div><label>Nova observação<input id="obx" placeholder="Digite e clique em Adicionar"></label><div class="act"><button onclick="closeModal()">Fechar</button><button class="p" onclick="obsS(${id})">Adicionar</button></div>`);
+      $('#obx').focus();
+    }
+    function obsS(id) {
+      const loan = appState.loans.find((x) => x.id == id);
+      const val = $('#obx').value.trim();
+      if (!val) return alert('Digite a observação.');
+      loan.obs = [...obsList(loan), { t: now(), u: appState.user.nome, x: val }];
+      saveData(); closeModal(); draw(); toast('Observação adicionada.');
+    }
+
+    async function exp() {
+      const columns = ['Item','Código','Setor do item','Pessoa','Telefone','Setor/Ministério','Emprestado em','Devolvido em','Registrado por','Devolução registrada por','Observação','Status'];
+      const csvQuote = (v) => '"' + String(v ?? '').replace(/"/g, '""') + '"';
+      const rows = [columns, ...listFiltrada().map((l) => [l.iDesc, l.iCod, l.iSet, l.pNome, l.pTel, l.pSet, dt(l.out), l.dv ? dt(l.dv) : '', l.userOut, l.userIn, obsList(l).map((o) => dt(o.t) + ' ' + o.u + ': ' + o.x).join(' | '), l.dv ? 'Devolvido' : 'Pendente'])];
+      const text = '\ufeff' + rows.map((r) => r.map(csvQuote).join(';')).join('\r\n');
+      const blob = new Blob([text], { type: 'text/csv;charset=utf-8' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = 'emprestimos-ibb.csv';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(link.href);
+      toast('Arquivo exportado.');
+    }
+
+    async function imp() {
+      const table = $('#app table');
+      if (!table) return alert('Nada para imprimir.');
+      const clone = table.cloneNode(true);
+      clone.querySelectorAll('tr').forEach((r) => { if (r.lastElementChild) r.lastElementChild.remove(); });
+      const title = ($('header h1') || {}).textContent || 'Relatório';
+      const filterLabel = { hoje: 'Hoje', semana: 'Semana', mes: 'Mês', per: `Período ${appState.a} a ${appState.b}`, pend: 'Pendentes de devolução' }[appState.f];
+      const sub = appState.view === 'emp' ? filterLabel + ' · ' : '';
+      const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"><title>${esc(title)}</title><style>body{font:13px system-ui,sans-serif;margin:24px;color:#000}h1{font-size:18px;margin:0 0 4px}p{margin:0 0 14px;color:#444}table{border-collapse:collapse;width:100%}th,td{text-align:left;padding:6px;border-bottom:1px solid #bbb;vertical-align:top}th{font-size:11px;text-transform:uppercase}small{color:#555}</style></head><body><h1>${esc(title)}</h1><p>${esc(sub)}Emitido em ${dt(now())}</p>${clone.outerHTML}<script>onload=()=>setTimeout(()=>print(),300)<\/script></body></html>`;
+      const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = 'impressao-ibb.html';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(link.href);
+      toast('Arquivo baixado. Abra-o para imprimir.');
+    }
+
+    function vCfg() {
+      const z = new Date(now() - new Date().getTimezoneOffset() * 6e4).toISOString().slice(0, 16);
+      return `
+        <div class="bar"><h3 style="margin:0">Usuários</h3><span class="sp"></span><button class="p" onclick="uForm()">＋ Novo usuário</button></div>
+        <div class="card tw"><table><tr><th>Nome<th>Usuário<th>Perfil<th>Status<th></tr>${appState.users.map((u) => `<tr class="${u.ativo ? '' : 'off'}"><td>${esc(u.nome)}<td>${esc(u.login)}<td>${u.perfil}<td>${u.ativo ? 'Ativo' : 'Inativo'}<td><button onclick="uForm(${u.id})">Editar</button> <button class="d" onclick="tg('users', ${u.id})">${u.ativo ? 'Inativar' : 'Ativar'}</button></tr>`).join('')}</table></div>
+        <h3>Data e hora do sistema</h3>
+        <div class="card">
+          <p class="mu">Hora atual do sistema: <b>${dt(now())}</b>. Os registros de empréstimo e devolução usam este relógio.</p>
+          <div class="bar"><input type="datetime-local" id="cdt" value="${z}"><button class="p" onclick="setT()">Aplicar</button><button onclick="appState.off=0; saveData(); draw()">Usar hora do dispositivo</button></div>
+        </div>
+      `;
+    }
+
+    function setT() {
+      const v = $('#cdt').value;
+      if (!v) return;
+      appState.off = new Date(v).getTime() - Date.now();
+      saveData();
+      draw();
+    }
+
+    function uForm(id) {
+      const user = appState.users.find((x) => x.id == id) || { perfil: 'Recepção' };
+      modal(`<h3>${id ? 'Editar' : 'Novo'} usuário</h3><label>Nome<input id="un" value="${esc(user.nome)}"></label><label>Usuário (login)<input id="ul" value="${esc(user.login)}"></label><label>Senha ${id ? '(deixe em branco para manter)' : ''}<input id="up" type="password"></label><label>Perfil<select id="uf"><option ${user.perfil === 'Admin' ? 'selected' : ''}>Admin</option><option ${user.perfil !== 'Admin' ? 'selected' : ''}>Recepção</option></select></label><p class="mu" style="font-size:12px">Admin: tudo, incluindo itens e configurações. Recepção: empréstimos e cadastros (sem Configurações).</p><div class="act"><button onclick="closeModal()">Cancelar</button><button class="p" onclick="uSave(${id || 0})">Salvar</button></div>`);
+    }
+
+    async function uSave(id) {
+      const nome = $('#un').value.trim();
+      const login = $('#ul').value.trim();
+      const senha = $('#up').value;
+      const perfil = $('#uf').value;
+      if (!nome || !login || (!id && !senha)) return alert('Preencha nome, usuário e senha.');
+      if (appState.users.some((x) => x.id != id && x.login.toLowerCase() === login.toLowerCase())) return alert('Este usuário já existe.');
+      if (id) {
+        const user = appState.users.find((x) => x.id == id);
+        if (user.perfil === 'Admin' && perfil !== 'Admin' && appState.users.filter((x) => x.ativo && x.perfil === 'Admin').length < 2) return alert('É preciso manter ao menos um Admin ativo.');
+        Object.assign(user, { nome, login, perfil });
+        if (senha) user.senha = await hash(senha);
+      } else {
+        appState.users.push({ id: nid(), nome, login, senha: await hash(senha), perfil, ativo: 1 });
+      }
+      saveData(); closeModal(); draw();
+    }
+
+    init();
+  </script>
+</body>
+</html>
+
