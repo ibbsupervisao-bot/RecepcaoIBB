@@ -1,7 +1,7 @@
 # Recepção IBB
 
 Sistema de controle de empréstimos de chaves, controles e equipamentos da recepção da IBB.
-Site estático publicado no GitHub Pages, com login e banco de dados no Firebase.
+Site estático publicado no GitHub Pages em **https://recepcaoibb.github.io**, com login e banco de dados no Firebase.
 
 ## Como funciona
 
@@ -31,8 +31,9 @@ Site estático publicado no GitHub Pages, com login e banco de dados no Firebase
 
 ## Publicação (GitHub Pages)
 
+Repositório `recepcaoibb/recepcaoibb.github.io` (organização `recepcaoibb`, ligada à conta ibbsupervisao-bot).
 Settings → Pages → Source: *Deploy from a branch* → Branch `main` / `(root)`.
-Endereço: https://ibbsupervisao-bot.github.io/RecepcaoIBB/
+Endereço: https://recepcaoibb.github.io (autorizado no Firebase em Authentication → Configurações → Domínios autorizados).
 
 Para alterar as regras do banco: edite `firestore.rules` e cole o conteúdo em
 Firebase Console → Firestore → Regras → Publicar.
