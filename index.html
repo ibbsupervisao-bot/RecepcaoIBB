@@ -96,7 +96,8 @@
       f: 'hoje',
       a: '',
       b: '',
-      aut: []
+      aut: [],
+      autSet: []
     };
     // Última versão gravada/lida de cada documento: só o que mudou é enviado ao Firestore.
     const saved = new Map();
@@ -111,6 +112,16 @@
     const isAdmin = () => appState.user && appState.user.perfil === 'Admin';
     const lo = (itemId) => appState.loans.find((l) => l.itemId == itemId && !l.dv);
     const plain = (o) => JSON.parse(JSON.stringify(o));
+    // Compara setores ignorando maiúsculas, acentos e espaços extras.
+    const norm = (s) => String(s ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().replace(/\s+/g, ' ').toLowerCase();
+    // Pessoa autorizada num item restrito: incluída pelo nome OU pertence a um setor/ministério autorizado.
+    const autorizado = (item, p) => !!p && ((item.aut || []).includes(p.id) || (item.autSet || []).some((s) => norm(s) === norm(p.setor)));
+    const autorizadosDe = (item) => appState.people.filter((p) => p.ativo && autorizado(item, p));
+    const setoresPessoas = () => {
+      const m = new Map();
+      appState.people.filter((p) => p.ativo && p.setor).forEach((p) => { if (!m.has(norm(p.setor))) m.set(norm(p.setor), p.setor.trim()); });
+      return [...m.values()].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+    };
 
     async function saveData() {
       const db = appState.db;
@@ -351,7 +362,7 @@
       if (peopleMode) {
         html += '<tr><th>Nome<th>Telefone<th>Setor/Ministério<th>Status<th></tr>' + appState.people.filter(fq).map((p) => `<tr class="${p.ativo ? '' : 'off'}"><td>${esc(p.nome)}<td>${esc(p.tel)}<td>${esc(p.setor)}<td>${p.ativo ? 'Ativo' : 'Inativo'}<td><button onclick="pForm(${p.id})">Editar</button> <button class="d" onclick="tg('people', ${p.id})">${p.ativo ? 'Inativar' : 'Ativar'}</button></tr>`).join('');
       } else {
-        html += '<tr><th>Descrição<th>Código<th>Setor/Ministério<th>Restrito<th>Status<th></tr>' + appState.items.filter(fq).map((i) => `<tr class="${i.ativo ? '' : 'off'}"><td>${esc(i.desc)}<td>${esc(i.cod)}<td>${esc(i.setor)}<td>${i.restr ? `Sim (${(i.aut || []).length} autorizados)` : 'Não'}<td>${i.ativo ? 'Ativo' : 'Inativo'}<td><button onclick="iForm(${i.id})">Editar</button> <button class="d" onclick="tg('items', ${i.id})">${i.ativo ? 'Inativar' : 'Ativar'}</button></tr>`).join('');
+        html += '<tr><th>Descrição<th>Código<th>Setor/Ministério<th>Restrito<th>Status<th></tr>' + appState.items.filter(fq).map((i) => `<tr class="${i.ativo ? '' : 'off'}"><td>${esc(i.desc)}<td>${esc(i.cod)}<td>${esc(i.setor)}<td>${i.restr ? `Sim (${autorizadosDe(i).length} autorizados${(i.autSet || []).length ? ' · setores: ' + i.autSet.map(esc).join(', ') : ''})` : 'Não'}<td>${i.ativo ? 'Ativo' : 'Inativo'}<td><button onclick="iForm(${i.id})">Editar</button> <button class="d" onclick="tg('items', ${i.id})">${i.ativo ? 'Inativar' : 'Ativar'}</button></tr>`).join('');
       }
       return html + '</table>' + ((peopleMode ? appState.people : appState.items).filter(fq).length ? '' : '<p class="mu">Nenhum registro encontrado.</p>') + '</div>';
     }
@@ -385,12 +396,34 @@
     function iForm(id) {
       const item = appState.items.find((x) => x.id == id) || {};
       appState.aut = [...(item.aut || [])];
-      modal(`<h3>${id ? 'Editar' : 'Novo'} item</h3><label>Descrição<input id="xd" value="${esc(item.desc)}"></label><label>Código<input id="xc" value="${esc(item.cod)}"></label><label>Setor/Ministério<input id="xs" value="${esc(item.setor)}"></label><label><input type="checkbox" id="xr" ${item.restr ? 'checked' : ''} onchange="aR()"> Restrito (somente pessoas autorizadas)</label><div id="ar"></div><div class="act"><button onclick="closeModal()">Cancelar</button><button class="p" onclick="iSave(${id || 0})">Salvar</button></div>`);
+      appState.autSet = [...(item.autSet || [])];
+      modal(`<h3>${id ? 'Editar' : 'Novo'} item</h3><label>Descrição<input id="xd" value="${esc(item.desc)}"></label><label>Código<input id="xc" value="${esc(item.cod)}"></label><label>Setor/Ministério<input id="xs" value="${esc(item.setor)}"></label><label><input type="checkbox" id="xr" ${item.restr ? 'checked' : ''} onchange="aR()"> Restrito (somente setores/ministérios ou pessoas autorizadas)</label><div id="ar"></div><div class="act"><button onclick="closeModal()">Cancelar</button><button class="p" onclick="iSave(${id || 0})">Salvar</button></div>`);
       aR();
     }
     function aR() {
-      $('#ar').innerHTML = $('#xr').checked ? `<div class="r2"><select id="as"><option value="">Selecionar pessoa autorizada…</option>${appState.people.filter((p) => p.ativo && !appState.aut.includes(p.id)).map((p) => `<option value="${p.id}">${esc(p.nome)} (${esc(p.setor)})</option>`).join('')}</select><button onclick="aA()">Adicionar</button></div><div>${appState.aut.map((a) => { const p = appState.people.find((z) => z.id == a); return `<span class="chip">${esc(p ? p.nome : '?')} <a onclick="aD(${a})">✕</a></span>`; }).join('') || '<small class="mu">Nenhuma pessoa autorizada ainda.</small>'}</div>` : '';
+      if (!$('#xr').checked) { $('#ar').innerHTML = ''; return; }
+      const usados = appState.autSet.map(norm);
+      const opcoes = setoresPessoas().filter((x) => !usados.includes(norm(x)));
+      const contaSetor = (x) => appState.people.filter((p) => p.ativo && norm(p.setor) === norm(x)).length;
+      const pelosSetores = appState.people.filter((p) => p.ativo && usados.includes(norm(p.setor)));
+      const avulsas = appState.people.filter((p) => p.ativo && !appState.aut.includes(p.id) && !usados.includes(norm(p.setor)));
+      $('#ar').innerHTML = `
+        <div style="margin-top:8px"><b>Setores/ministérios autorizados</b>
+          <p class="mu" style="font-size:12px;margin:2px 0">Todas as pessoas do setor ficam autorizadas, inclusive as que forem cadastradas depois.</p>
+          <div class="r2"><select id="ass"><option value="">Selecionar setor/ministério…</option>${opcoes.map((x) => `<option value="${esc(x)}">${esc(x)} (${contaSetor(x)} ${contaSetor(x) === 1 ? 'pessoa' : 'pessoas'})</option>`).join('')}</select><button onclick="aSA()">Adicionar</button></div>
+          <div>${appState.autSet.map((x, i) => `<span class="chip">${esc(x)} (${contaSetor(x)}) <a onclick="aSD(${i})">✕</a></span>`).join('') || '<small class="mu">Nenhum setor autorizado.</small>'}</div>
+          ${pelosSetores.length ? `<p class="mu" style="font-size:12px;margin:6px 0 0">Autorizadas pelo setor: ${pelosSetores.map((p) => esc(p.nome)).join(', ')}</p>` : ''}
+        </div>
+        <div style="margin-top:12px"><b>Pessoas autorizadas individualmente</b>
+          <div class="r2"><select id="as"><option value="">Selecionar pessoa autorizada…</option>${avulsas.map((p) => `<option value="${p.id}">${esc(p.nome)} (${esc(p.setor)})</option>`).join('')}</select><button onclick="aA()">Adicionar</button></div>
+          <div>${appState.aut.map((a) => { const p = appState.people.find((z) => z.id == a); return `<span class="chip">${esc(p ? p.nome : '?')} <a onclick="aD(${a})">✕</a></span>`; }).join('') || '<small class="mu">Nenhuma pessoa adicionada individualmente.</small>'}</div>
+        </div>`;
     }
+    function aSA() {
+      const v = $('#ass').value;
+      if (v && !appState.autSet.map(norm).includes(norm(v))) { appState.autSet.push(v); aR(); }
+    }
+    function aSD(i) { appState.autSet.splice(i, 1); aR(); }
     function aA() {
       const v = +$('#as').value;
       if (v) { appState.aut.push(v); aR(); }
@@ -401,10 +434,10 @@
       const cod = $('#xc').value.trim();
       const setor = $('#xs').value.trim();
       const restr = $('#xr').checked;
-      if (!desc || !cod || !setor) return alert('Preencha descrição, código e setor/ministério.');
-      if (restr && !appState.aut.length) return alert('Item restrito precisa de ao menos uma pessoa autorizada.');
-      if (appState.items.some((y) => y.id != id && y.cod.toLowerCase() === cod.toLowerCase())) return alert('Já existe um item com este código.');
-      const payload = { desc, cod, setor, restr, aut: restr ? [...appState.aut] : [] };
+      if (!desc || !setor) return alert('Preencha descrição e setor/ministério.');
+      if (restr && !appState.aut.length && !appState.autSet.length) return alert('Item restrito precisa de ao menos um setor/ministério ou uma pessoa autorizada.');
+      if (cod && appState.items.some((y) => y.id != id && (y.cod || '').toLowerCase() === cod.toLowerCase())) return alert('Já existe um item com este código.');
+      const payload = { desc, cod, setor, restr, aut: restr ? [...appState.aut] : [], autSet: restr ? [...appState.autSet] : [] };
       if (id) Object.assign(appState.items.find((y) => y.id == id), payload);
       else appState.items.push({ id: nid(), ativo: 1, ...payload });
       saveData(); closeModal(); draw();
@@ -474,7 +507,7 @@
       const q = $('#pq').value.toLowerCase();
       const item = appState.r.item;
       let list = appState.people.filter((p) => p.ativo && p.nome.toLowerCase().includes(q));
-      if (item.restr) list = list.filter((p) => (item.aut || []).includes(p.id));
+      if (item.restr) list = list.filter((p) => autorizado(item, p));
       $('#pr').innerHTML = list.slice(0, 6).map((p) => `<div class="row"><div>${esc(p.nome)} <small class="mu">${esc(p.setor)} · ${esc(p.tel)}</small></div><button onclick="ch(${p.id})">Selecionar</button></div>`).join('') + (item.restr ? (list.length ? '' : '<p class="mu">Nenhuma pessoa autorizada encontrada. Este item não pode ser emprestado a outra pessoa.</p>') : `<div class="row"><span class="mu">Não encontrou?</span><button onclick="np()">＋ Cadastrar nova pessoa</button></div>`);
     }
     function ch(id) {
@@ -501,7 +534,7 @@
         appState.people.push(pessoa);
       }
       if (!pessoa) return alert('Selecione ou cadastre a pessoa.');
-      if (item.restr && !(item.aut || []).includes(pessoa.id)) return alert('Pessoa não autorizada para este item restrito.');
+      if (item.restr && !autorizado(item, pessoa)) return alert('Pessoa não autorizada para este item restrito.');
       const obs = $('#obx').value.trim() ? [{ t: now(), u: appState.user.nome, x: $('#obx').value.trim() }] : [];
       appState.loans.push({ id: nid(), itemId: item.id, iDesc: item.desc, iCod: item.cod, iSet: item.setor, pId: pessoa.id, pNome: pessoa.nome, pTel: pessoa.tel, pSet: pessoa.setor, out: now(), dv: 0, userOut: appState.user.nome, userIn: '', obs });
       saveData(); closeModal(); draw();
