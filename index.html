@@ -468,7 +468,7 @@
           <button class="p" onclick="reg()">Registrar</button>
         </div>
         ${appState.f === 'per' ? `<div class="bar"><label style="margin:0">De <input type="date" value="${appState.a}" onchange="appState.a=this.value; draw()"></label><label style="margin:0">Até <input type="date" value="${appState.b}" onchange="appState.b=this.value; draw()"></label></div>` : ''}
-        <div class="card tw"><table><tr><th>Item<th>Pessoa<th>Setor/Ministério<th>Emprestado em<th>Devolvido em<th></tr>${lista.map((l) => `<tr><td>${esc(l.iDesc)}<br><small class="mu">${esc(l.iCod)}</small><td>${esc(l.pNome)}<br><small class="mu">${esc(l.pTel)}</small><td>${esc(l.pSet)}<td>${dt(l.out)}<td>${l.dv ? dt(l.dv) : '<span class="tag wn">Pendente</span>'}<td><button onclick="obsE(${l.id})" onmouseenter="tip(this,${l.id})" onmouseleave="tipx()">Obs.${obsList(l).length ? ` (${obsList(l).length})` : ''}</button> ${l.dv ? '' : `<button onclick="dev(${l.id})">Devolver</button>`}${isAdmin() ? ` <button class="d" onclick="exE(${l.id})">Excluir</button>` : ''}</tr>`).join('')}</table>${lista.length ? '' : '<p class="mu">Nenhum registro neste filtro.</p>'}</div>
+        <div class="card tw"><table><tr><th>Item<th>Pessoa<th>Setor/Ministério<th>Emprestado em<th>Emprestado por<th>Devolvido em<th>Devolução por<th></tr>${lista.map((l) => `<tr><td>${esc(l.iDesc)}<br><small class="mu">${esc(l.iCod)}</small><td>${esc(l.pNome)}<br><small class="mu">${esc(l.pTel)}</small><td>${esc(l.pSet)}<td>${dt(l.out)}<td>${esc(l.userOut || '—')}<td>${l.dv ? dt(l.dv) : '<span class="tag wn">Pendente</span>'}<td>${l.dv ? esc(l.userIn || '—') : '—'}<td><button onclick="obsE(${l.id})" onmouseenter="tip(this,${l.id})" onmouseleave="tipx()">Obs.${obsList(l).length ? ` (${obsList(l).length})` : ''}</button> ${l.dv ? '' : `<button onclick="dev(${l.id})">Devolver</button>`}${isAdmin() ? ` <button class="d" onclick="exE(${l.id})">Excluir</button>` : ''}</tr>`).join('')}</table>${lista.length ? '' : '<p class="mu">Nenhum registro neste filtro.</p>'}</div>
       `;
     }
 
@@ -592,7 +592,7 @@
     }
 
     async function exp() {
-      const columns = ['Item','Código','Setor do item','Pessoa','Telefone','Setor/Ministério','Emprestado em','Devolvido em','Registrado por','Devolução registrada por','Observação','Status'];
+      const columns = ['Item','Código','Setor do item','Pessoa','Telefone','Setor/Ministério','Emprestado em','Devolvido em','Emprestado por (usuário)','Devolução registrada por (usuário)','Observação','Status'];
       const csvQuote = (v) => '"' + String(v ?? '').replace(/"/g, '""') + '"';
       const rows = [columns, ...listFiltrada().map((l) => [l.iDesc, l.iCod, l.iSet, l.pNome, l.pTel, l.pSet, dt(l.out), l.dv ? dt(l.dv) : '', l.userOut, l.userIn, obsList(l).map((o) => dt(o.t) + ' ' + o.u + ': ' + o.x).join(' | '), l.dv ? 'Devolvido' : 'Pendente'])];
       const text = '\ufeff' + rows.map((r) => r.map(csvQuote).join(';')).join('\r\n');
