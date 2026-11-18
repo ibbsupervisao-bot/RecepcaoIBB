@@ -1,0 +1,49 @@
+rules_version = '2';
+
+// Regras do banco do RecepcaoIBB.
+// Só quem fez login E tem um perfil ativo na coleção "users" acessa os dados.
+// Só Admin cria/edita usuários e altera a hora do sistema.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+    function myProfile() {
+      return /databases/$(database)/documents/users/$(request.auth.uid);
+    }
+    function isActive() {
+      return signedIn()
+        && exists(myProfile())
+        && get(myProfile()).data.ativo == 1;
+    }
+    function isAdmin() {
+      return isActive() && get(myProfile()).data.perfil == 'Admin';
+    }
+
+    match /users/{uid} {
+      // Cada pessoa logada pode ler o próprio perfil (para o app saber se está liberada).
+      allow read: if isActive() || (signedIn() && request.auth.uid == uid);
+      allow write: if isAdmin();
+    }
+
+    match /people/{id} {
+      allow read, write: if isActive();
+    }
+
+    match /items/{id} {
+      allow read, write: if isActive();
+    }
+
+    match /loans/{id} {
+      allow read, write: if isActive();
+    }
+
+    match /cfg/{id} {
+      allow read: if isActive();
+      allow write: if isAdmin();
+    }
+
+    // Qualquer outro caminho fica bloqueado.
+  }
+}

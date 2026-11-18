@@ -1,34 +1,38 @@
 # Recepção IBB
 
-Sistema de controle de empréstimos adaptado para publicação em GitHub Pages ou Netlify.
+Sistema de controle de empréstimos de chaves, controles e equipamentos da recepção da IBB.
+Site estático publicado no GitHub Pages, com login e banco de dados no Firebase.
 
-## Publicação
+## Como funciona
 
-1. Edite o arquivo `firebase-config.js` com os dados do seu projeto Firebase.
-2. Faça commit e push para o GitHub.
-3. No GitHub Pages:
-   - Settings > Pages
-   - Source: Deploy from a branch
-   - Branch: `main` / `root`
-4. No Netlify:
-   - Conecte o repositório ou arraste a pasta
-   - Publicar com `index.html`
+- **Login:** Firebase Authentication (e-mail e senha).
+- **Dados:** Cloud Firestore, projeto `recepcaoibb-efe73`, região São Paulo (`southamerica-east1`).
+- **Atualização em tempo real:** o que uma recepcionista registra aparece na hora para as outras.
+- **Segurança:** só quem tem login **e** um perfil ativo na coleção `users` acessa os dados
+  (veja `firestore.rules`). Só Admin cria/edita usuários e altera a hora do sistema.
+- **Plano:** Spark (gratuito, sem cartão). O Storage não está ativado porque o app não envia arquivos.
 
-## Funcionalidades mantidas
+## Arquivos
 
-- Login com usuários e perfis
-- Cadastro de pessoas e itens
-- Empréstimos e devoluções
-- Filtros, impressão e exportação CSV
-- Observações de empréstimo
-- Persistência no Firebase Firestore
-- Fallback automático para `localStorage` quando o Firebase não estiver configurado
+| Arquivo | O que é |
+|---|---|
+| `index.html` | O app inteiro |
+| `firebase-config.js` | Identificação pública do projeto Firebase (pode ficar no repositório; a proteção vem das regras) |
+| `firestore.rules` | Cópia das regras de segurança publicadas no console do Firebase |
 
-## Primeiro acesso
+## Usuários
 
-- Usuário: `admin`
-- Senha: `admin123`
+- **Novo usuário:** entre como Admin → Configurações → "Novo usuário". Informe nome, e-mail, senha inicial e perfil.
+- **Trocar senha:** Configurações → Editar → "Enviar link de nova senha" (o usuário recebe um e-mail),
+  ou o próprio usuário clica em "Esqueci minha senha" na tela de login.
+- **Bloquear acesso:** Configurações → Inativar. O usuário perde o acesso aos dados na hora.
+- **Primeiro administrador:** foi criado no console do Firebase (Authentication → Usuários) e liberado
+  com um documento em `users/{UID}` contendo `nome`, `login` (e-mail), `perfil: "Admin"` e `ativo: 1`.
 
-## Importante
+## Publicação (GitHub Pages)
 
-A versão web não funciona corretamente sem o Firebase configurado, porque o sistema usa Firestore para armazenar os dados do aplicativo.
+Settings → Pages → Source: *Deploy from a branch* → Branch `main` / `(root)`.
+Endereço: https://ibbsupervisao-bot.github.io/RecepcaoIBB/
+
+Para alterar as regras do banco: edite `firestore.rules` e cole o conteúdo em
+Firebase Console → Firestore → Regras → Publicar.

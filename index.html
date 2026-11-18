@@ -80,6 +80,7 @@
   <div id="mo"></div>
 
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
   <script src="./firebase-config.js"></script>
   <script>
@@ -87,6 +88,7 @@
       users: [], people: [], items: [], loans: [], off: 0,
       user: null,
       db: null,
+      auth: null,
       view: 'login',
       tab: 'p',
       cq: '',
@@ -94,106 +96,121 @@
       f: 'hoje',
       a: '',
       b: '',
-      auth: []
+      aut: []
     };
+    // Última versão gravada/lida de cada documento: só o que mudou é enviado ao Firestore.
+    const saved = new Map();
+    const COLLECTIONS = ['users', 'people', 'items', 'loans'];
+    let unsubscribers = [];
 
     const $ = (s) => document.querySelector(s);
-    const hash = async (s) => {
-      const data = new TextEncoder().encode('ibb:' + s);
-      const digest = await crypto.subtle.digest('SHA-256', data);
-      return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
-    };
     const now = () => Date.now() + appState.off;
     const nid = () => Date.now() * 100 + Math.floor(Math.random() * 100);
-    const esc = (s) => String(s ?? '').replace(/[&<>\"]/g, (c) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
+    const esc = (s) => String(s ?? '').replace(/[&<>\"']/g, (c) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
     const dt = (t) => t ? new Date(t).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : '—';
     const isAdmin = () => appState.user && appState.user.perfil === 'Admin';
     const lo = (itemId) => appState.loans.find((l) => l.itemId == itemId && !l.dv);
-
-    function readLocal() {
-      try {
-        const raw = localStorage.getItem('ibb_recepcao_state');
-        return raw ? JSON.parse(raw) : { users: [], people: [], items: [], loans: [], off: 0 };
-      } catch {
-        return { users: [], people: [], items: [], loans: [], off: 0 };
-      }
-    }
-
-    function writeLocal() {
-      localStorage.setItem('ibb_recepcao_state', JSON.stringify({
-        users: appState.users,
-        people: appState.people,
-        items: appState.items,
-        loans: appState.loans,
-        off: appState.off
-      }));
-    }
-
-    function getFirebaseConfig() {
-      const cfg = window.FIREBASE_CONFIG || {};
-      return cfg && cfg.apiKey && cfg.projectId && !String(cfg.projectId).includes('YOUR_PROJECT_ID') ? cfg : null;
-    }
+    const plain = (o) => JSON.parse(JSON.stringify(o));
 
     async function saveData() {
-      if (appState.db && appState.db.mode !== 'local') {
-        try {
-          await Promise.all([
-            ...appState.users.map((u) => appState.db.collection('users').doc(String(u.id)).set(u)),
-            ...appState.people.map((p) => appState.db.collection('people').doc(String(p.id)).set(p)),
-            ...appState.items.map((i) => appState.db.collection('items').doc(String(i.id)).set(i)),
-            ...appState.loans.map((l) => appState.db.collection('loans').doc(String(l.id)).set(l)),
-          ]);
-          await appState.db.doc('cfg/main').set({ off: appState.off });
-        } catch (err) {
-          console.error('saveData failed', err);
-          alert('Não foi possível gravar os dados no Firebase. Verifique a configuração.');
+      const db = appState.db;
+      const writes = [];
+      for (const name of COLLECTIONS) {
+        if (name === 'users' && !isAdmin()) continue;
+        for (const doc of appState[name]) {
+          const key = name + '/' + doc.id;
+          const json = JSON.stringify(doc);
+          if (saved.get(key) !== json) {
+            writes.push(db.collection(name).doc(String(doc.id)).set(plain(doc)).then(() => saved.set(key, json)));
+          }
         }
-        return;
       }
-      writeLocal();
-    }
-
-    async function loadRemoteData() {
-      appState.db = firebase.firestore();
-      const collections = ['users', 'people', 'items', 'loans'];
-      for (const name of collections) {
-        const snap = await appState.db.collection(name).get();
-        appState[name] = snap.docs.map((doc) => doc.data());
-      }
-      const cfgDoc = await appState.db.doc('cfg/main').get();
-      appState.off = cfgDoc.exists ? Number(cfgDoc.data().off || 0) : 0;
-    }
-
-    async function seedDefaults() {
-      if (appState.users.length > 0) return;
-      const adminHash = await hash('admin123');
-      const recepcaoHash = await hash('recepcao123');
-      appState.users = [
-        { id: 1, nome: 'Administrador', login: 'admin', senha: adminHash, perfil: 'Admin', ativo: 1 },
-        { id: 2, nome: 'Recepção', login: 'recepcao', senha: recepcaoHash, perfil: 'Recepção', ativo: 1 }
-      ];
-      await saveData();
-      draw();
-    }
-
-    async function init() {
-      $('#app').innerHTML = '<main><p class="mu">Carregando…</p></main>';
-      const cfg = getFirebaseConfig();
-      if (!cfg) {
-        const state = readLocal();
-        appState.users = state.users || [];
-        appState.people = state.people || [];
-        appState.items = state.items || [];
-        appState.loans = state.loans || [];
-        appState.off = Number(state.off || 0);
-        appState.db = { mode: 'local' };
-        await seedDefaults();
-        return;
+      if (isAdmin()) {
+        const json = JSON.stringify({ off: appState.off });
+        if (saved.get('cfg/main') !== json) writes.push(db.doc('cfg/main').set({ off: appState.off }).then(() => saved.set('cfg/main', json)));
       }
       try {
-        if (!firebase.apps.length) firebase.initializeApp(cfg);
-        await loadRemoteData();
-        await seedDefaults();
+        await Promise.all(writes);
+      } catch (err) {
+        console.error('saveData failed', err);
+        alert('Não foi possível gravar os dados no Firebase. Verifique sua conexão e tente de novo.');
+      }
+    }
+
+    function modalOpen() { return !!$('#mo') && $('#mo').innerHTML !== ''; }
+
+    function stopListening() {
+      unsubscribers.forEach((u) => u());
+      unsubscribers = [];
+      saved.clear();
+    }
+
+    // Lê os dados e mantém tudo atualizado em tempo real entre os computadores da recepção.
+    function startListening() {
+      const db = appState.db;
+      const ready = [];
+      for (const name of COLLECTIONS) {
+        ready.push(new Promise((resolve, reject) => {
+          unsubscribers.push(db.collection(name).onSnapshot((snap) => {
+            appState[name] = snap.docs.map((d) => d.data());
+            appState[name].forEach((d) => saved.set(name + '/' + d.id, JSON.stringify(d)));
+            if (name === 'users' && appState.user) {
+              const me = appState[name].find((u) => u.id === appState.user.id);
+              if (me) appState.user = me;
+            }
+            resolve();
+            const typing = document.activeElement && /INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName);
+            if (appState.user && !modalOpen() && !typing) draw();
+          }, reject));
+        }));
+      }
+      ready.push(new Promise((resolve, reject) => {
+        unsubscribers.push(db.doc('cfg/main').onSnapshot((d) => {
+          appState.off = d.exists ? Number(d.data().off || 0) : 0;
+          saved.set('cfg/main', JSON.stringify({ off: appState.off }));
+          resolve();
+        }, reject));
+      }));
+      return Promise.all(ready);
+    }
+
+    function msg(title, text) {
+      $('#app').innerHTML = `<main><div class="card login"><h2>${esc(title)}</h2><p>${esc(text)}</p><button onclick="sair()">Voltar ao login</button></div></main>`;
+    }
+
+    async function onLogin(fbUser) {
+      if (!fbUser) {
+        stopListening();
+        appState.user = null;
+        appState.view = 'login';
+        draw();
+        return;
+      }
+      $('#app').innerHTML = '<main><p class="mu">Carregando…</p></main>';
+      try {
+        const snap = await appState.db.collection('users').doc(fbUser.uid).get();
+        const profile = snap.exists ? snap.data() : null;
+        if (!profile || !profile.ativo) {
+          return msg('Acesso não liberado', `A conta ${fbUser.email} ainda não foi liberada ou está inativa. Peça a um administrador para liberar seu acesso.`);
+        }
+        appState.user = profile;
+        await startListening();
+        appState.view = 'home';
+        draw();
+      } catch (error) {
+        console.error(error);
+        msg('Erro ao carregar', 'Não foi possível carregar os dados. Verifique sua conexão e tente de novo.');
+      }
+    }
+
+    function init() {
+      $('#app').innerHTML = '<main><p class="mu">Carregando…</p></main>';
+      try {
+        if (!firebase.apps.length) firebase.initializeApp(window.FIREBASE_CONFIG);
+        appState.db = firebase.firestore();
+        appState.auth = firebase.auth();
+        appState.auth.languageCode = 'pt-BR';
+        appState.auth.onAuthStateChanged(onLogin);
       } catch (error) {
         console.error(error);
         $('#app').innerHTML = '<main><div class="card login"><h2>Erro ao carregar</h2><p>Não foi possível conectar ao Firebase. Verifique o arquivo firebase-config.js.</p></div></main>';
@@ -226,10 +243,10 @@
             <div class="card login">
               <h2>IBB – Empréstimos</h2>
               <p class="mu">Controle de chaves, controles e equipamentos da recepção.</p>
-              <label>Usuário<input id="lu" autocomplete="username"></label>
+              <label>E-mail<input id="lu" type="email" autocomplete="username"></label>
               <label>Senha<input id="lp" type="password" autocomplete="current-password" onkeydown="if(event.key==='Enter') entrar()"></label>
               <button class="p" style="width:100%" onclick="entrar()">Entrar</button>
-              <p class="mu" style="font-size:12px">Primeiro acesso: admin / admin123.</p>
+              <p class="mu" style="font-size:12px"><a href="#" onclick="esqueci(); return false">Esqueci minha senha</a></p>
             </div>
           </main>
         `;
@@ -246,16 +263,36 @@
     function tick() { const c = $('#clk'); if (c) c.textContent = dt(now()); }
     setInterval(tick, 20000);
 
+    const AUTH_ERR = {
+      'auth/invalid-credential': 'E-mail ou senha inválidos.',
+      'auth/invalid-email': 'E-mail inválido.',
+      'auth/user-disabled': 'Esta conta foi desativada.',
+      'auth/too-many-requests': 'Muitas tentativas. Aguarde alguns minutos e tente de novo.',
+      'auth/network-request-failed': 'Sem conexão com a internet.',
+      'auth/email-already-in-use': 'Já existe uma conta com este e-mail.',
+      'auth/weak-password': 'A senha precisa ter pelo menos 6 caracteres.'
+    };
+    const authMsg = (e) => AUTH_ERR[e && e.code] || 'Não foi possível concluir. Tente de novo.';
+
     async function entrar() {
-      const login = $('#lu').value.trim();
-      const passHash = await hash($('#lp').value);
-      const user = appState.users.find((u) => u.ativo && u.login === login && u.senha === passHash);
-      if (!user) return alert('Usuário ou senha inválidos.');
-      appState.user = user;
-      appState.view = 'home';
-      draw();
+      const email = $('#lu').value.trim();
+      const senha = $('#lp').value;
+      if (!email || !senha) return alert('Informe e-mail e senha.');
+      try {
+        await appState.auth.signInWithEmailAndPassword(email, senha);
+      } catch (e) {
+        alert(authMsg(e));
+      }
     }
-    function sair() { appState.user = null; appState.view = 'login'; closeModal(); draw(); }
+    async function esqueci() {
+      const email = ($('#lu') && $('#lu').value.trim()) || '';
+      if (!email) return alert('Digite seu e-mail no campo acima e clique de novo em "Esqueci minha senha".');
+      try {
+        await appState.auth.sendPasswordResetEmail(email);
+      } catch (e) { /* não revela se o e-mail existe */ }
+      toast('Se este e-mail tiver acesso, você receberá um link para criar uma nova senha.');
+    }
+    function sair() { closeModal(); appState.auth.signOut(); }
 
     const IC = {
       key: '<circle cx="8" cy="15" r="4"/><path d="M10.8 12.2 20 3m-3 3 3 3"/>',
@@ -347,27 +384,27 @@
 
     function iForm(id) {
       const item = appState.items.find((x) => x.id == id) || {};
-      appState.auth = [...(item.aut || [])];
+      appState.aut = [...(item.aut || [])];
       modal(`<h3>${id ? 'Editar' : 'Novo'} item</h3><label>Descrição<input id="xd" value="${esc(item.desc)}"></label><label>Código<input id="xc" value="${esc(item.cod)}"></label><label>Setor/Ministério<input id="xs" value="${esc(item.setor)}"></label><label><input type="checkbox" id="xr" ${item.restr ? 'checked' : ''} onchange="aR()"> Restrito (somente pessoas autorizadas)</label><div id="ar"></div><div class="act"><button onclick="closeModal()">Cancelar</button><button class="p" onclick="iSave(${id || 0})">Salvar</button></div>`);
       aR();
     }
     function aR() {
-      $('#ar').innerHTML = $('#xr').checked ? `<div class="r2"><select id="as"><option value="">Selecionar pessoa autorizada…</option>${appState.people.filter((p) => p.ativo && !appState.auth.includes(p.id)).map((p) => `<option value="${p.id}">${esc(p.nome)} (${esc(p.setor)})</option>`).join('')}</select><button onclick="aA()">Adicionar</button></div><div>${appState.auth.map((a) => { const p = appState.people.find((z) => z.id == a); return `<span class="chip">${esc(p ? p.nome : '?')} <a onclick="aD(${a})">✕</a></span>`; }).join('') || '<small class="mu">Nenhuma pessoa autorizada ainda.</small>'}</div>` : '';
+      $('#ar').innerHTML = $('#xr').checked ? `<div class="r2"><select id="as"><option value="">Selecionar pessoa autorizada…</option>${appState.people.filter((p) => p.ativo && !appState.aut.includes(p.id)).map((p) => `<option value="${p.id}">${esc(p.nome)} (${esc(p.setor)})</option>`).join('')}</select><button onclick="aA()">Adicionar</button></div><div>${appState.aut.map((a) => { const p = appState.people.find((z) => z.id == a); return `<span class="chip">${esc(p ? p.nome : '?')} <a onclick="aD(${a})">✕</a></span>`; }).join('') || '<small class="mu">Nenhuma pessoa autorizada ainda.</small>'}</div>` : '';
     }
     function aA() {
       const v = +$('#as').value;
-      if (v) { appState.auth.push(v); aR(); }
+      if (v) { appState.aut.push(v); aR(); }
     }
-    function aD(id) { appState.auth = appState.auth.filter((z) => z != id); aR(); }
+    function aD(id) { appState.aut = appState.aut.filter((z) => z != id); aR(); }
     function iSave(id) {
       const desc = $('#xd').value.trim();
       const cod = $('#xc').value.trim();
       const setor = $('#xs').value.trim();
       const restr = $('#xr').checked;
       if (!desc || !cod || !setor) return alert('Preencha descrição, código e setor/ministério.');
-      if (restr && !appState.auth.length) return alert('Item restrito precisa de ao menos uma pessoa autorizada.');
+      if (restr && !appState.aut.length) return alert('Item restrito precisa de ao menos uma pessoa autorizada.');
       if (appState.items.some((y) => y.id != id && y.cod.toLowerCase() === cod.toLowerCase())) return alert('Já existe um item com este código.');
-      const payload = { desc, cod, setor, restr, aut: restr ? [...appState.auth] : [] };
+      const payload = { desc, cod, setor, restr, aut: restr ? [...appState.aut] : [] };
       if (id) Object.assign(appState.items.find((y) => y.id == id), payload);
       else appState.items.push({ id: nid(), ativo: 1, ...payload });
       saveData(); closeModal(); draw();
@@ -537,7 +574,7 @@
       const z = new Date(now() - new Date().getTimezoneOffset() * 6e4).toISOString().slice(0, 16);
       return `
         <div class="bar"><h3 style="margin:0">Usuários</h3><span class="sp"></span><button class="p" onclick="uForm()">＋ Novo usuário</button></div>
-        <div class="card tw"><table><tr><th>Nome<th>Usuário<th>Perfil<th>Status<th></tr>${appState.users.map((u) => `<tr class="${u.ativo ? '' : 'off'}"><td>${esc(u.nome)}<td>${esc(u.login)}<td>${u.perfil}<td>${u.ativo ? 'Ativo' : 'Inativo'}<td><button onclick="uForm(${u.id})">Editar</button> <button class="d" onclick="tg('users', ${u.id})">${u.ativo ? 'Inativar' : 'Ativar'}</button></tr>`).join('')}</table></div>
+        <div class="card tw"><table><tr><th>Nome<th>E-mail<th>Perfil<th>Status<th></tr>${appState.users.map((u) => `<tr class="${u.ativo ? '' : 'off'}"><td>${esc(u.nome)}<td>${esc(u.login)}<td>${esc(u.perfil)}<td>${u.ativo ? 'Ativo' : 'Inativo'}<td><button onclick="uForm('${esc(u.id)}')">Editar</button> <button class="d" onclick="tg('users', '${esc(u.id)}')">${u.ativo ? 'Inativar' : 'Ativar'}</button></tr>`).join('')}</table></div>
         <h3>Data e hora do sistema</h3>
         <div class="card">
           <p class="mu">Hora atual do sistema: <b>${dt(now())}</b>. Os registros de empréstimo e devolução usam este relógio.</p>
@@ -555,26 +592,55 @@
     }
 
     function uForm(id) {
-      const user = appState.users.find((x) => x.id == id) || { perfil: 'Recepção' };
-      modal(`<h3>${id ? 'Editar' : 'Novo'} usuário</h3><label>Nome<input id="un" value="${esc(user.nome)}"></label><label>Usuário (login)<input id="ul" value="${esc(user.login)}"></label><label>Senha ${id ? '(deixe em branco para manter)' : ''}<input id="up" type="password"></label><label>Perfil<select id="uf"><option ${user.perfil === 'Admin' ? 'selected' : ''}>Admin</option><option ${user.perfil !== 'Admin' ? 'selected' : ''}>Recepção</option></select></label><p class="mu" style="font-size:12px">Admin: tudo, incluindo itens e configurações. Recepção: empréstimos e cadastros (sem Configurações).</p><div class="act"><button onclick="closeModal()">Cancelar</button><button class="p" onclick="uSave(${id || 0})">Salvar</button></div>`);
+      const user = appState.users.find((x) => x.id === id) || { perfil: 'Recepção' };
+      const senhaCampo = id
+        ? `<p class="mu" style="font-size:12px">Para trocar a senha, use o botão abaixo: o usuário recebe um link no e-mail para criar uma nova.</p><button onclick="resetSenha('${esc(id)}')">Enviar link de nova senha</button>`
+        : '<label>Senha inicial (mínimo 6 caracteres)<input id="up" type="password" autocomplete="new-password"></label>';
+      modal(`<h3>${id ? 'Editar' : 'Novo'} usuário</h3><label>Nome<input id="un" value="${esc(user.nome)}"></label><label>E-mail<input id="ul" type="email" value="${esc(user.login)}" ${id ? 'disabled' : ''}></label>${senhaCampo}<label>Perfil<select id="uf"><option ${user.perfil === 'Admin' ? 'selected' : ''}>Admin</option><option ${user.perfil !== 'Admin' ? 'selected' : ''}>Recepção</option></select></label><p class="mu" style="font-size:12px">Admin: tudo, incluindo itens e configurações. Recepção: empréstimos e cadastros (sem Configurações).</p><div class="act"><button onclick="closeModal()">Cancelar</button><button class="p" onclick="uSave('${esc(id || '')}')">Salvar</button></div>`);
+    }
+
+    async function resetSenha(id) {
+      const user = appState.users.find((x) => x.id === id);
+      if (!user) return;
+      try {
+        await appState.auth.sendPasswordResetEmail(user.login);
+        toast('Link de nova senha enviado para ' + user.login + '.');
+      } catch (e) {
+        alert(authMsg(e));
+      }
+    }
+
+    // Cria a conta no Firebase Authentication sem desconectar o administrador.
+    async function criarConta(email, senha) {
+      const sec = firebase.apps.find((a) => a.name === 'cadastro') || firebase.initializeApp(window.FIREBASE_CONFIG, 'cadastro');
+      const cred = await sec.auth().createUserWithEmailAndPassword(email, senha);
+      const uid = cred.user.uid;
+      await sec.auth().signOut();
+      return uid;
     }
 
     async function uSave(id) {
       const nome = $('#un').value.trim();
-      const login = $('#ul').value.trim();
-      const senha = $('#up').value;
+      const login = $('#ul').value.trim().toLowerCase();
       const perfil = $('#uf').value;
-      if (!nome || !login || (!id && !senha)) return alert('Preencha nome, usuário e senha.');
-      if (appState.users.some((x) => x.id != id && x.login.toLowerCase() === login.toLowerCase())) return alert('Este usuário já existe.');
       if (id) {
-        const user = appState.users.find((x) => x.id == id);
+        if (!nome) return alert('Preencha o nome.');
+        const user = appState.users.find((x) => x.id === id);
         if (user.perfil === 'Admin' && perfil !== 'Admin' && appState.users.filter((x) => x.ativo && x.perfil === 'Admin').length < 2) return alert('É preciso manter ao menos um Admin ativo.');
-        Object.assign(user, { nome, login, perfil });
-        if (senha) user.senha = await hash(senha);
+        Object.assign(user, { nome, perfil });
       } else {
-        appState.users.push({ id: nid(), nome, login, senha: await hash(senha), perfil, ativo: 1 });
+        const senha = $('#up').value;
+        if (!nome || !login || !senha) return alert('Preencha nome, e-mail e senha.');
+        if (appState.users.some((x) => (x.login || '').toLowerCase() === login)) return alert('Este e-mail já está cadastrado.');
+        let uid;
+        try {
+          uid = await criarConta(login, senha);
+        } catch (e) {
+          return alert(authMsg(e));
+        }
+        appState.users.push({ id: uid, nome, login, perfil, ativo: 1 });
       }
-      saveData(); closeModal(); draw();
+      await saveData(); closeModal(); draw();
     }
 
     init();
