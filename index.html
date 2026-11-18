@@ -468,8 +468,32 @@
           <button class="p" onclick="reg()">Registrar</button>
         </div>
         ${appState.f === 'per' ? `<div class="bar"><label style="margin:0">De <input type="date" value="${appState.a}" onchange="appState.a=this.value; draw()"></label><label style="margin:0">Até <input type="date" value="${appState.b}" onchange="appState.b=this.value; draw()"></label></div>` : ''}
-        <div class="card tw"><table><tr><th>Item<th>Pessoa<th>Setor/Ministério<th>Emprestado em<th>Devolvido em<th></tr>${lista.map((l) => `<tr><td>${esc(l.iDesc)}<br><small class="mu">${esc(l.iCod)}</small><td>${esc(l.pNome)}<br><small class="mu">${esc(l.pTel)}</small><td>${esc(l.pSet)}<td>${dt(l.out)}<td>${l.dv ? dt(l.dv) : '<span class="tag wn">Pendente</span>'}<td><button onclick="obsE(${l.id})" onmouseenter="tip(this,${l.id})" onmouseleave="tipx()">Obs.${obsList(l).length ? ` (${obsList(l).length})` : ''}</button> ${l.dv ? '' : `<button onclick="dev(${l.id})">Devolver</button>`}</tr>`).join('')}</table>${lista.length ? '' : '<p class="mu">Nenhum registro neste filtro.</p>'}</div>
+        <div class="card tw"><table><tr><th>Item<th>Pessoa<th>Setor/Ministério<th>Emprestado em<th>Devolvido em<th></tr>${lista.map((l) => `<tr><td>${esc(l.iDesc)}<br><small class="mu">${esc(l.iCod)}</small><td>${esc(l.pNome)}<br><small class="mu">${esc(l.pTel)}</small><td>${esc(l.pSet)}<td>${dt(l.out)}<td>${l.dv ? dt(l.dv) : '<span class="tag wn">Pendente</span>'}<td><button onclick="obsE(${l.id})" onmouseenter="tip(this,${l.id})" onmouseleave="tipx()">Obs.${obsList(l).length ? ` (${obsList(l).length})` : ''}</button> ${l.dv ? '' : `<button onclick="dev(${l.id})">Devolver</button>`}${isAdmin() ? ` <button class="d" onclick="exE(${l.id})">Excluir</button>` : ''}</tr>`).join('')}</table>${lista.length ? '' : '<p class="mu">Nenhum registro neste filtro.</p>'}</div>
       `;
+    }
+
+    // Exclusão de registros de empréstimo: somente Admin (também garantido pelas regras do Firestore).
+    function exE(id) {
+      if (!isAdmin()) return;
+      const l = appState.loans.find((x) => x.id == id);
+      if (!l) return alert('Registro não encontrado.');
+      modal(`<h3>Excluir registro de empréstimo?</h3>
+        <p><b>${esc(l.iDesc)}</b> <small class="mu">${esc(l.iCod)}</small><br>${esc(l.pNome)} · ${esc(l.pSet)}<br><small class="mu">Emprestado em ${dt(l.out)}${l.dv ? ' · devolvido em ' + dt(l.dv) : ' · ainda não devolvido'}</small></p>
+        <p class="mu" style="font-size:13px">O registro será apagado definitivamente e não aparecerá mais em relatórios nem exportações. Esta ação não pode ser desfeita.${l.dv ? '' : ' Como o item não foi devolvido, ele voltará a aparecer como disponível.'}</p>
+        <div class="act"><button onclick="closeModal()">Cancelar</button><button class="d" onclick="exS(${l.id})">Excluir definitivamente</button></div>`);
+    }
+    async function exS(id) {
+      if (!isAdmin()) return;
+      try {
+        await appState.db.collection('loans').doc(String(id)).delete();
+        appState.loans = appState.loans.filter((x) => x.id != id);
+        saved.delete('loans/' + id);
+        closeModal(); draw();
+        toast('Registro excluído.');
+      } catch (err) {
+        console.error(err);
+        alert('Não foi possível excluir o registro. Verifique sua conexão e tente de novo.');
+      }
     }
 
     function reg() {
